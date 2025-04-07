@@ -27,7 +27,7 @@ Connects your 3D printer(s) to Home Assistant and exposes state sensors.
 ## 🚀 Setup
 
 ### 1. **Add the Automation YAML**
-Copy the full YAML automation from the `automations` folder into your Home Assistant automations via the UI editor or directly in your YAML files.
+Copy the full YAML into Home Assistant as a new automation. You can paste it directly into the Automation Editor (YAML mode) or save it as a new file if you're using file-based automations.
 
 ### 2. **Customize These Variables (at the top of the YAML):**
 ```yaml
