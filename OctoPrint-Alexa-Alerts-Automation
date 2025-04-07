@@ -1,0 +1,113 @@
+alias: Notify via Alexa - OctoPrint Job Status v10
+description: >
+  Alexa announcements (multi-device) and optional persistent notifications
+  for OctoPrint job status. Customize the top section for your setup.
+
+variables:
+  # ========================
+  # 🎛️ CUSTOMIZATION SECTION
+  # ========================
+
+  alexa_notify_services:
+    - notify.alexa_media_basemenmancave
+    - notify.alexa_media_echoclockdot
+    - notify.alexa_media_basement_bathroom_echo_flex  # 🔊 Add or remove devices here
+
+  enable_persistent_notifications: true  # ✅ Set to false if you hate popups
+
+  alexa_start_hour: 9
+  alexa_start_minute: 0
+  alexa_end_hour: 12
+  alexa_end_minute: 0
+
+  printer_names:
+    sensor.chiron_right_current_state: Chiron Right
+    sensor.chiron_left_current_state: Chiron Left
+
+  # =============================================
+  # 🚫******Editing below at your own risk!******🚫
+  # =============================================
+
+  friendly_name: >
+    {{ printer_names[trigger.entity_id] if trigger.entity_id in printer_names else trigger.entity_id }}
+
+  notification_message: Status changed on {{ friendly_name }} to {{ trigger.to_state.state }}
+
+  within_alexa_hours: >
+    {% set now = now() %}
+    {% set start = now.replace(hour=alexa_start_hour, minute=alexa_start_minute, second=0, microsecond=0) %}
+    {% set end = now.replace(hour=alexa_end_hour, minute=alexa_end_minute, second=0, microsecond=0) %}
+    {{ start <= now <= end }}
+
+trigger:
+  - platform: state
+    entity_id:
+      - sensor.chiron_right_current_state
+      - sensor.chiron_left_current_state
+
+action:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.to_state.state == 'Printing' and trigger.from_state.state != 'Paused' }}
+        sequence:
+          - variables:
+              notification_message: Print job started on {{ friendly_name }}.
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.from_state.state == 'Paused' and trigger.to_state.state == 'Printing' }}
+        sequence:
+          - variables:
+              notification_message: Print job resumed on {{ friendly_name }}.
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == 'Paused' }}"
+        sequence:
+          - variables:
+              notification_message: Print job paused on {{ friendly_name }}.
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.from_state.state == 'Printing' and trigger.to_state.state == 'Operational' }}
+        sequence:
+          - variables:
+              notification_message: Print job completed successfully on {{ friendly_name }}.
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.from_state.state == 'Printing' and trigger.to_state.state == 'Error' }}
+        sequence:
+          - variables:
+              notification_message: Print job failed on {{ friendly_name }}! State is now Error.
+
+  # 🔊 Alexa notifications (multi-device) — ONLY during allowed hours
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ within_alexa_hours }}"
+        sequence:
+          - repeat:
+              for_each: "{{ alexa_notify_services }}"
+              sequence:
+                - service: "{{ repeat.item }}"
+                  data:
+                    message: "{{ notification_message }}"
+                    data:
+                      type: announce
+
+  # 📌 Persistent notification — always if enabled
+  - condition: template
+    value_template: "{{ enable_persistent_notifications }}"
+  - service: persistent_notification.create
+    data:
+      message: "{{ notification_message }}"
+      title: "3D Printer Notification: {{ friendly_name }}"
+
+mode: queued
+max: 10
