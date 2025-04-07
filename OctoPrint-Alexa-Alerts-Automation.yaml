@@ -1,44 +1,66 @@
-alias: Notify via Alexa - OctoPrint Job Status v11
+alias: Notify via Alexa - OctoPrint Job Status v12
 description: >
-  Alexa announcements and persistent notifications for OctoPrint job status.
-  Fully customizable and supports multiple printers + multiple Alexa devices.
+  This automation sends Alexa announcements and persistent notifications for OctoPrint job statuses.
+  It's designed to handle multiple printers and notify multiple Alexa devices.
 
-# ========================================================
-# 🔧 EDITABLE SETTINGS BELOW — MAKE IT YOUR OWN
-# ========================================================
+# =====================  CONFIGURATION VARIABLES =====================
 
 variables:
+  # === List of Alexa Devices to Notify ===
+  # Add the service names of your Alexa media player entities here.
+  # You can find these in Developer Tools -> States (search for 'notify.alexa_media').
   alexa_notify_services:
-    - notify.alexa_media_basemenmancave
-    - notify.alexa_media_echoclockdot
-    - notify.alexa_media_basement_bathroom_echo_flex
+    - notify.alexa_media_basemenmancave    # Example: Change to your first Alexa device's notify service
+    - notify.alexa_media_echoclockdot       # Example: Change to your second Alexa device's notify service
+    - notify.alexa_media_basement_bathroom_echo_flex # Example: Add more as needed
 
+  # === Enable Persistent Notifications ===
+  # Set to 'true' to always show persistent notifications in the Home Assistant UI
+  # whenever a printer status changes, regardless of the Alexa notification time.
   enable_persistent_notifications: true
-#24 hour time
-  alexa_start_hour: 9
-  alexa_start_minute: 0
-  alexa_end_hour: 22
-  alexa_end_minute: 0
 
+  # === Alexa Notification Time Window ===
+  # Define the hours during which Alexa notifications should be sent.
+  alexa_start_hour: 9    # Start hour (24-hour format, e.g., 9 for 9 AM)
+  alexa_start_minute: 0  # Start minute
+  alexa_end_hour: 22   # End hour (24-hour format, e.g., 22 for 10 PM)
+  alexa_end_minute: 0    # End minute
+
+  # === Printer Sensor Entities ===
+  # List the entity IDs of your OctoPrint printer state sensors.
+  # These sensors should report the current status of your 3D printers (e.g., 'Printing', 'Paused', 'Operational').
+  printer_entities:
+    - sensor.chiron_right_current_state   # Example: Your first printer's state sensor
+    - sensor.chiron_left_current_state    # Example: Your second printer's state sensor
+    # Add more printer entity IDs as needed
+
+  # === Printer Friendly Names ===
+  # Define a mapping between your printer sensor entity IDs and their friendly names.
+  # This makes the notifications more readable.
   printer_names:
-    sensor.chiron_right_current_state: Chiron Right
-    sensor.chiron_left_current_state: Chiron Left
+    sensor.chiron_right_current_state: Chiron Right   # Example: Friendly name for the first printer
+    sensor.chiron_left_current_state: Chiron Left    # Example: Friendly name for the second printer
+    # Add more mappings for your other printers
 
-# ========================================================
-# ⚠️ WARNING: Editing below this line is at your own risk!
-# ========================================================
+# ===================== TRIGGER SECTION =====================
 
 trigger:
+  # This automation triggers whenever the state of any of the defined printer sensors changes.
   - platform: state
     entity_id:
       - sensor.chiron_right_current_state
       - sensor.chiron_left_current_state
+      # Add more printer entity IDs here if you have them
 
 mode: queued
-max: 10
+max: 10 # If multiple state changes happen quickly, process them in order, up to 10 at a time.
+
+# ===================== ACTION SECTION =====================
 
 action:
+  # This 'choose' action block determines the notification message based on the printer's state change.
   - choose:
+      # Condition: Job started (state changed to 'Printing' and wasn't 'Paused' before)
       - conditions:
           - condition: template
             value_template: >
@@ -46,6 +68,8 @@ action:
         sequence:
           - variables:
               notification_message: "Print job started on {{ printer_names[trigger.entity_id] if trigger.entity_id in printer_names else trigger.entity_id }}."
+
+      # Condition: Job resumed (state changed from 'Paused' to 'Printing')
       - conditions:
           - condition: template
             value_template: >
@@ -53,12 +77,16 @@ action:
         sequence:
           - variables:
               notification_message: "Print job resumed on {{ printer_names[trigger.entity_id] if trigger.entity_id in printer_names else trigger.entity_id }}."
+
+      # Condition: Job paused (state changed to 'Paused')
       - conditions:
           - condition: template
             value_template: "{{ trigger.to_state.state == 'Paused' }}"
         sequence:
           - variables:
               notification_message: "Print job paused on {{ printer_names[trigger.entity_id] if trigger.entity_id in printer_names else trigger.entity_id }}."
+
+      # Condition: Job completed successfully (state changed from 'Printing' to 'Operational')
       - conditions:
           - condition: template
             value_template: >
@@ -66,6 +94,8 @@ action:
         sequence:
           - variables:
               notification_message: "Print job completed successfully on {{ printer_names[trigger.entity_id] if trigger.entity_id in printer_names else trigger.entity_id }}."
+
+      # Condition: Job failed (state changed from 'Printing' to 'Error')
       - conditions:
           - condition: template
             value_template: >
@@ -74,31 +104,40 @@ action:
           - variables:
               notification_message: "Print job failed on {{ printer_names[trigger.entity_id] if trigger.entity_id in printer_names else trigger.entity_id }}! State is now Error."
 
-  # Alexa time check
+  # ===================== ALEXA NOTIFICATION LOGIC =====================
+
   - variables:
       now_hour: "{{ now().hour }}"
       now_minute: "{{ now().minute }}"
 
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ (now_hour > alexa_start_hour or (now_hour == alexa_start_hour and now_minute >= alexa_start_minute)) and
-                 (now_hour < alexa_end_hour or (now_hour == alexa_end_hour and now_minute < alexa_end_minute)) }}
-        sequence:
-          - repeat:
-              for_each: "{{ alexa_notify_services }}"
-              sequence:
-                - service: "{{ repeat.item }}"
-                  data:
-                    message: "{{ notification_message }}"
-                    data:
-                      type: announce
+  # Check if the current time is within the defined Alexa notification window.
+  - if:
+      - condition: template
+        value_template: >
+          {{ (now_hour > alexa_start_hour or (now_hour == alexa_start_hour and now_minute >= alexa_start_minute)) and
+             (now_hour < alexa_end_hour or (now_hour == alexa_end_hour and now_minute < alexa_end_minute)) }}
+    then:
+      # Loop through each Alexa device service and send the notification.
+      - repeat:
+          for_each: "{{ alexa_notify_services }}"
+          sequence:
+            - service: "{{ repeat.item }}"
+              data:
+                message: "{{ notification_message }}"
+                data:
+                  type: announce  # Make Alexa announce the notification
 
-  # Persistent notification always (if enabled)
-  - condition: template
-    value_template: "{{ enable_persistent_notifications }}"
-  - service: persistent_notification.create
-    data:
-      title: "3D Printer Notification: {{ printer_names[trigger.entity_id] if trigger.entity_id in printer_names else trigger.entity_id }}"
-      message: "{{ notification_message }}"
+  # ===================== PERSISTENT NOTIFICATION LOGIC =====================
+  # This block creates a persistent notification if 'enable_persistent_notifications' is true.
+  - if:
+      - condition: template
+        value_template: "{{ enable_persistent_notifications }}"
+    then:
+      - service: persistent_notification.create
+        data:
+          title: "3D Printer Notification: {{ printer_names[trigger.entity_id] if trigger.entity_id in printer_names else trigger.entity_id }}"
+          message: "{{ notification_message }}"
+      - service: system_log.write
+        data:
+          message: "Persistent notification created for: {{ notification_message }}"
+          level: info
