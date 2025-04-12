@@ -1,4 +1,4 @@
-# 💥 **The Ultimate OctoPrint Job Notification Automation** 💥  
+# 💥 **The Ultimate OctoPrint Job Notification Automation**   
 **Blasting through your smart home like a sonic boom!**
 
 Fed up with sitting around watching your 3D printer? Wish your home assistant would give you the lowdown without you having to babysit? Now your OctoPrint jobs won’t just update you – **they’ll shake your world with Alexa-powered notifications**!  
