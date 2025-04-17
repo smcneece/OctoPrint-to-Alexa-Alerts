@@ -1,3 +1,4 @@
+# This is a work in progress. 
 # 💥 **The Ultimate OctoPrint Job Notification Automation**   
 **Blasting through your smart home like a sonic boom!**
 
@@ -20,9 +21,6 @@ And for those quieter moments (or when Alexa’s feeling lazy), **persistent not
 ## 🛠️ **Gear You’ll Need** 🔧
 
 Before you hit the ground running, make sure you’ve got these tools set up:
-
-### ✅ **HACS – Power Up Your Home Assistant!**  
-The easiest way to grab killer community add-ons. Get it [here](https://hacs.xyz/).
 
 ### ✅ **Alexa Media Player – Talk to Your Echo Devices!**  
 This lets Home Assistant send messages to your Echo. Get it [here](https://github.com/custom-components/alexa_media_player).
